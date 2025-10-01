@@ -3,22 +3,22 @@ package evm
 import (
 	"math"
 	"math/big"
+	"time"
 
+	errorsmod "cosmossdk.io/errors"
+	sdkmath "cosmossdk.io/math"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/txpool"
 	ethtypes "github.com/ethereum/go-ethereum/core/types"
 
+	sdk "github.com/cosmos/cosmos-sdk/types"
+	errortypes "github.com/cosmos/cosmos-sdk/types/errors"
+	txtypes "github.com/cosmos/cosmos-sdk/types/tx"
+	authante "github.com/cosmos/cosmos-sdk/x/auth/ante"
 	anteinterfaces "github.com/cosmos/evm/ante/interfaces"
 	feemarkettypes "github.com/cosmos/evm/x/feemarket/types"
 	evmkeeper "github.com/cosmos/evm/x/vm/keeper"
 	evmtypes "github.com/cosmos/evm/x/vm/types"
-
-	errorsmod "cosmossdk.io/errors"
-	sdkmath "cosmossdk.io/math"
-
-	sdk "github.com/cosmos/cosmos-sdk/types"
-	errortypes "github.com/cosmos/cosmos-sdk/types/errors"
-	txtypes "github.com/cosmos/cosmos-sdk/types/tx"
 )
 
 const AcceptedTxType = 0 |
@@ -30,12 +30,34 @@ const AcceptedTxType = 0 |
 // MonoDecorator is a single decorator that handles all the prechecks for
 // ethereum transactions.
 type MonoDecorator struct {
-	accountKeeper   anteinterfaces.AccountKeeper
-	feeMarketKeeper anteinterfaces.FeeMarketKeeper
-	evmKeeper       anteinterfaces.EVMKeeper
-	maxGasWanted    uint64
-	evmParams       *evmtypes.Params
-	feemarketParams *feemarkettypes.Params
+	accountKeeper        anteinterfaces.AccountKeeper
+	feeMarketKeeper      anteinterfaces.FeeMarketKeeper
+	evmKeeper            anteinterfaces.EVMKeeper
+	maxGasWanted         uint64
+	evmParams            *evmtypes.Params
+	feemarketParams      *feemarkettypes.Params
+	maxTxTimeoutDuration time.Duration
+	unorderedTxGasCost   uint64
+}
+
+type MonoDecoratorOption func(*MonoDecorator)
+
+// WithMaxUnorderedTxTimeoutDuration sets the maximum TTL a transaction can define
+// for unordered transactions.
+func WithMaxUnorderedTxTimeoutDuration(duration time.Duration) MonoDecoratorOption {
+	return func(md *MonoDecorator) {
+		md.maxTxTimeoutDuration = duration
+	}
+}
+
+// WithUnorderedTxGasCost sets the gas cost for unordered transactions.
+// We must charge extra gas for unordered transactions
+// as they incur extra processing time for cleaning up the expired txs in x/auth PreBlocker.
+// Note: this value was chosen by 2x-ing the cost of fetching and removing an unordered nonce entry.
+func WithUnorderedTxGasCost(gasCost uint64) MonoDecoratorOption {
+	return func(md *MonoDecorator) {
+		md.unorderedTxGasCost = gasCost
+	}
 }
 
 // NewEVMMonoDecorator creates the 'mono' decorator, that is used to run the ante handle logic
@@ -51,15 +73,24 @@ func NewEVMMonoDecorator(
 	maxGasWanted uint64,
 	evmParams *evmtypes.Params,
 	feemarketParams *feemarkettypes.Params,
+	opts ...MonoDecoratorOption,
 ) MonoDecorator {
-	return MonoDecorator{
-		accountKeeper:   accountKeeper,
-		feeMarketKeeper: feeMarketKeeper,
-		evmKeeper:       evmKeeper,
-		maxGasWanted:    maxGasWanted,
-		evmParams:       evmParams,
-		feemarketParams: feemarketParams,
+	md := MonoDecorator{
+		accountKeeper:        accountKeeper,
+		feeMarketKeeper:      feeMarketKeeper,
+		evmKeeper:            evmKeeper,
+		maxGasWanted:         maxGasWanted,
+		evmParams:            evmParams,
+		feemarketParams:      feemarketParams,
+		maxTxTimeoutDuration: authante.DefaultMaxTimeoutDuration,
+		unorderedTxGasCost:   authante.DefaultUnorderedTxGasCost,
 	}
+
+	for _, opt := range opts {
+		opt(&md)
+	}
+
+	return md
 }
 
 // AnteHandle handles the entire decorator chain using a mono decorator.
