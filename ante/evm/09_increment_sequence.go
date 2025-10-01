@@ -9,21 +9,19 @@ import (
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	errortypes "github.com/cosmos/cosmos-sdk/types/errors"
 	sdkerrors "github.com/cosmos/cosmos-sdk/types/errors"
-	anteinterfaces "github.com/cosmos/evm/ante/interfaces"
 	"github.com/cosmos/evm/mempool"
 )
 
 // IncrementNonce increments the sequence of the account.
-func IncrementNonce(
+func (md MonoDecorator) IncrementNonce(
 	ctx sdk.Context,
-	accountKeeper anteinterfaces.AccountKeeper,
 	account sdk.AccountI,
 	tx sdk.Tx,
 	txNonce uint64,
 ) error {
 	utx, ok := tx.(sdk.TxWithUnordered)
 	isUnordered := ok && utx.GetUnordered()
-	unorderedEnabled := accountKeeper.UnorderedTransactionsEnabled()
+	unorderedEnabled := md.accountKeeper.UnorderedTransactionsEnabled()
 
 	fmt.Println("[DEBUG] EVM IncrementNonce handler")
 	fmt.Printf("[DEBUG] nonce: %v, isUnordered: %v, unorderedEnabled: %v\n", txNonce, isUnordered, unorderedEnabled)
@@ -70,7 +68,7 @@ func IncrementNonce(
 		return errorsmod.Wrapf(err, "failed to set sequence to %d", accountNonce)
 	}
 
-	accountKeeper.SetAccount(ctx, account)
+	md.accountKeeper.SetAccount(ctx, account)
 	return nil
 }
 
