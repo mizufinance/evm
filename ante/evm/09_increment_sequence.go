@@ -120,7 +120,7 @@ func (md MonoDecorator) verifyUnorderedNonce(ctx sdk.Context, unorderedTx sdk.Tx
 	}
 
 	for _, signerAddr := range signerAddrs {
-		if err := svd.ak.TryAddUnorderedNonce(ctx, signerAddr, unorderedTx.GetTimeoutTimeStamp()); err != nil {
+		if err := md.accountKeeper.TryAddUnorderedNonce(ctx, signerAddr, unorderedTx.GetTimeoutTimeStamp()); err != nil {
 			return errorsmod.Wrapf(
 				sdkerrors.ErrInvalidRequest,
 				"failed to add unordered nonce: %s", err,
