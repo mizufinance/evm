@@ -33,7 +33,7 @@ func (md MonoDecorator) IncrementNonce(
 	accountNonce := account.GetSequence()
 
 	if isUnordered {
-		if err := verifyUnorderedNonce(ctx, utx); err != nil {
+		if err := md.verifyUnorderedNonce(ctx, utx); err != nil {
 			return err
 		}
 	} else {
@@ -81,7 +81,7 @@ func (md MonoDecorator) IncrementNonce(
 //
 // If all the checks above pass, the nonce is marked as used for each signer of
 // the transaction.
-func verifyUnorderedNonce(ctx sdk.Context, unorderedTx sdk.TxWithUnordered) error {
+func (md MonoDecorator) verifyUnorderedNonce(ctx sdk.Context, unorderedTx sdk.TxWithUnordered) error {
 	blockTime := ctx.BlockTime()
 	timeoutTimestamp := unorderedTx.GetTimeoutTimeStamp()
 
@@ -99,15 +99,15 @@ func verifyUnorderedNonce(ctx sdk.Context, unorderedTx sdk.TxWithUnordered) erro
 		)
 	}
 
-	if timeoutTimestamp.After(blockTime.Add(svd.maxTxTimeoutDuration)) {
+	if timeoutTimestamp.After(blockTime.Add(md.maxTxTimeoutDuration)) {
 		return errorsmod.Wrapf(
 			sdkerrors.ErrInvalidRequest,
 			"unordered tx ttl exceeds %s",
-			svd.maxTxTimeoutDuration.String(),
+			md.maxTxTimeoutDuration.String(),
 		)
 	}
 
-	ctx.GasMeter().ConsumeGas(svd.unorderedTxGasCost, "unordered tx")
+	ctx.GasMeter().ConsumeGas(md.unorderedTxGasCost, "unordered tx")
 
 	execMode := ctx.ExecMode()
 	if execMode == sdk.ExecModeSimulate {
