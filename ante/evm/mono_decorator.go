@@ -258,7 +258,7 @@ func (md MonoDecorator) AnteHandle(ctx sdk.Context, tx sdk.Tx, simulate bool, ne
 		)
 	}
 
-	if err := IncrementNonce(ctx, md.accountKeeper, acc, ethTx.Nonce()); err != nil {
+	if err := IncrementNonce(ctx, md.accountKeeper, acc, tx, ethTx.Nonce()); err != nil {
 		return ctx, err
 	}
 
