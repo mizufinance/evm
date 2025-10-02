@@ -23,8 +23,8 @@ func (md MonoDecorator) IncrementNonce(
 	isUnordered := ok && utx.GetUnordered()
 	unorderedEnabled := md.accountKeeper.UnorderedTransactionsEnabled()
 
-	fmt.Println("[DEBUG] EVM IncrementNonce handler")
-	fmt.Printf("[DEBUG] nonce: %v, isUnordered: %v, unorderedEnabled: %v\n", txNonce, isUnordered, unorderedEnabled)
+	fmt.Printf("\n\n[DEBUG] EVM IncrementNonce handler")
+	fmt.Printf("[DEBUG] nonce: %v, isUnordered: %v, unorderedEnabled: %v\n\n\n", txNonce, isUnordered, unorderedEnabled)
 
 	if isUnordered && !unorderedEnabled {
 		return errorsmod.Wrap(sdkerrors.ErrNotSupported, "unordered transactions are not enabled")
