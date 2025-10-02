@@ -33,7 +33,7 @@ func (md MonoDecorator) IncrementNonce(
 	accountNonce := account.GetSequence()
 
 	if isUnordered {
-		if err := md.verifyUnorderedNonce(ctx, utx); err != nil {
+		if err := md.verifyUnorderedNonce(ctx, account, utx); err != nil {
 			return err
 		}
 	} else {
@@ -81,7 +81,7 @@ func (md MonoDecorator) IncrementNonce(
 //
 // If all the checks above pass, the nonce is marked as used for each signer of
 // the transaction.
-func (md MonoDecorator) verifyUnorderedNonce(ctx sdk.Context, unorderedTx sdk.TxWithUnordered) error {
+func (md MonoDecorator) verifyUnorderedNonce(ctx sdk.Context, account sdk.AccountI, unorderedTx sdk.TxWithUnordered) error {
 	blockTime := ctx.BlockTime()
 	timeoutTimestamp := unorderedTx.GetTimeoutTimeStamp()
 
@@ -114,18 +114,13 @@ func (md MonoDecorator) verifyUnorderedNonce(ctx sdk.Context, unorderedTx sdk.Tx
 		return nil
 	}
 
-	signerAddrs, err := extractSignersBytes(unorderedTx)
+	err := md.accountKeeper.TryAddUnorderedNonce(
+		ctx,
+		account.GetAddress().Bytes(),
+		unorderedTx.GetTimeoutTimeStamp(),
+	)
 	if err != nil {
-		return err
-	}
-
-	for _, signerAddr := range signerAddrs {
-		if err := md.accountKeeper.TryAddUnorderedNonce(ctx, signerAddr, unorderedTx.GetTimeoutTimeStamp()); err != nil {
-			return errorsmod.Wrapf(
-				sdkerrors.ErrInvalidRequest,
-				"failed to add unordered nonce: %s", err,
-			)
-		}
+		return errorsmod.Wrapf(sdkerrors.ErrInvalidRequest, "failed to add unordered nonce: %s", err)
 	}
 
 	return nil
