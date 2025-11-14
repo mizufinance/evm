@@ -8,7 +8,6 @@
 package types
 
 import (
-	"errors"
 	"fmt"
 
 	"github.com/ethereum/go-ethereum/core/vm"
@@ -60,9 +59,6 @@ func GetChainConfig() *ChainConfig {
 // default values. The method is private because it should only be called once
 // in the EVMConfigurator.
 func SetChainConfig(cc *ChainConfig) error {
-	if chainConfig != nil && chainConfig.ChainId != DefaultEVMChainID {
-		return errors.New("chainConfig already set. Cannot set again the chainConfig")
-	}
 	config := DefaultChainConfig(0)
 	if cc != nil {
 		config = cc
