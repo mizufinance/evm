@@ -214,6 +214,21 @@ func NewExampleApp(
 	baseAppOptions ...func(*baseapp.BaseApp),
 ) *EVMD {
 	evmChainID := cast.ToUint64(appOpts.Get(srvflags.EVMChainID))
+
+	// Set default EVM coin info to prevent nil pointer dereferences in CLI commands.
+	// This provides a fallback when evmCoinInfo hasn't been initialized yet (e.g., gentx).
+	if coinInfo, ok := evmconfig.ChainsCoinInfo[evmChainID]; ok {
+		evmtypes.SetDefaultEvmCoinInfo(coinInfo)
+	} else {
+		// Default to 18 decimals configuration
+		evmtypes.SetDefaultEvmCoinInfo(evmtypes.EvmCoinInfo{
+			Denom:         "atest",
+			ExtendedDenom: "atest",
+			DisplayDenom:  "test",
+			Decimals:      evmtypes.EighteenDecimals.Uint32(),
+		})
+	}
+
 	encodingConfig := evmencoding.MakeConfig(evmChainID)
 
 	appCodec := encodingConfig.Codec
