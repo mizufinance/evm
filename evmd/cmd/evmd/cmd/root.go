@@ -54,9 +54,9 @@ func NewRootCmd() *cobra.Command {
 	// we "pre"-instantiate the application for getting the injected/configured encoding configuration
 	// and the CLI options for the modules
 	// add keyring to autocli opts
-	noOpEvmAppOptions := func(_ uint64) error {
-		return nil
-	}
+	//
+	// NOTE: We must use config.EvmAppOptions here (not a no-op) because CLI commands
+	// like gentx validate genesis which requires EVM coin info to be configured.
 	tempApp := evmd.NewExampleApp(
 		log.NewNopLogger(),
 		dbm.NewMemDB(),
@@ -64,7 +64,7 @@ func NewRootCmd() *cobra.Command {
 		true,
 		simtestutil.EmptyAppOptions{},
 		config.EVMChainID,
-		noOpEvmAppOptions,
+		config.EvmAppOptions,
 	)
 
 	encodingConfig := sdktestutil.TestEncodingConfig{
