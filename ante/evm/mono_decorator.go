@@ -36,6 +36,7 @@ type MonoDecorator struct {
 	maxGasWanted    uint64
 	evmParams       *evmtypes.Params
 	feemarketParams *feemarkettypes.Params
+	sigCache        SenderCache
 }
 
 // NewEVMMonoDecorator creates the 'mono' decorator, that is used to run the ante handle logic
@@ -60,6 +61,15 @@ func NewEVMMonoDecorator(
 		evmParams:       evmParams,
 		feemarketParams: feemarketParams,
 	}
+}
+
+// WithSignatureCache returns a copy of the decorator that skips re-recovering the
+// sender of a transaction already verified (e.g. during CheckTx). The cache must
+// be an app-level singleton so it spans the CheckTx->FinalizeBlock window; leaving
+// it unset preserves the existing behavior of recovering the sender every time.
+func (md MonoDecorator) WithSignatureCache(cache SenderCache) MonoDecorator {
+	md.sigCache = cache
+	return md
 }
 
 // AnteHandle handles the entire decorator chain using a mono decorator.
@@ -163,10 +173,11 @@ func (md MonoDecorator) AnteHandle(ctx sdk.Context, tx sdk.Tx, simulate bool, ne
 	}
 
 	// 5. signature verification
-	if err := SignatureVerification(
+	if err := SignatureVerificationWithCache(
 		ethMsg,
 		ethTx,
 		decUtils.Signer,
+		md.sigCache,
 	); err != nil {
 		return ctx, err
 	}
