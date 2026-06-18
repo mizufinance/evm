@@ -197,7 +197,7 @@ func BenchmarkApplyTransaction(b *testing.B) { //nolint:dupl
 		require.NoError(b, err)
 
 		b.StartTimer()
-		resp, err := suite.Network.App.GetEVMKeeper().ApplyTransaction(suite.Network.GetContext(), tx.AsTransaction())
+		resp, err := suite.Network.App.GetEVMKeeper().ApplyTransaction(suite.Network.GetContext(), tx)
 		b.StopTimer()
 
 		require.NoError(b, err)
@@ -226,7 +226,7 @@ func BenchmarkApplyTransactionWithLegacyTx(b *testing.B) { //nolint:dupl
 		require.NoError(b, err)
 
 		b.StartTimer()
-		resp, err := suite.Network.App.GetEVMKeeper().ApplyTransaction(suite.Network.GetContext(), tx.AsTransaction())
+		resp, err := suite.Network.App.GetEVMKeeper().ApplyTransaction(suite.Network.GetContext(), tx)
 		b.StopTimer()
 
 		require.NoError(b, err)
@@ -255,7 +255,7 @@ func BenchmarkApplyTransactionWithDynamicFeeTx(b *testing.B) {
 		require.NoError(b, err)
 
 		b.StartTimer()
-		resp, err := suite.Network.App.GetEVMKeeper().ApplyTransaction(suite.Network.GetContext(), tx.AsTransaction())
+		resp, err := suite.Network.App.GetEVMKeeper().ApplyTransaction(suite.Network.GetContext(), tx)
 		b.StopTimer()
 
 		require.NoError(b, err)
