@@ -61,6 +61,13 @@ func (k *Keeper) NewEVMWithOverridePrecompiles(
 		tracer = k.Tracer(ctx, msg, ethCfg)
 	}
 	vmConfig := k.VMConfig(ctx, msg, cfg, tracer)
+	if types.HasExecutionScopeHook(ctx) {
+		db, ok := stateDB.(*statedb.StateDB)
+		if !ok {
+			panic(types.ExecutionScopePanic{Cause: "execution scopes require concrete StateDB"})
+		}
+		vmConfig.Tracer = db.TraceExecutionFrames(vmConfig.Tracer)
+	}
 
 	signer := msg.From
 	accessControl := types.NewRestrictedPermissionPolicy(&cfg.Params.AccessControl, signer)
@@ -212,6 +219,16 @@ func (k *Keeper) ApplyTransaction(ctx sdk.Context, tx *ethtypes.Transaction) (*t
 	// Didn't use `Snapshot` because the context stack has exponential complexity on certain operations,
 	// thus restricted to be used only inside `ApplyMessage`.
 	tmpCtx, commitFn := ctx.CacheContext()
+	tmpCtx, scope, err := types.BeginExecutionScope(tmpCtx)
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		if scope != nil {
+			scope.Abort()
+		}
+	}()
+	adopt := func() { types.AdoptExecutionScope(scope, commitFn) }
 
 	// pass true to commit the StateDB
 	stateDB := statedb.New(tmpCtx, k, txConfig)
@@ -250,7 +267,14 @@ func (k *Keeper) ApplyTransaction(ctx sdk.Context, tx *ethtypes.Transaction) (*t
 
 		// If the tx failed we discard the old context and create a new one, so
 		// PostTxProcessing can persist data even if the tx fails.
+		if scope != nil {
+			scope.Abort()
+		}
 		tmpCtx, commitFn = ctx.CacheContext()
+		tmpCtx, scope, err = types.BeginExecutionScope(tmpCtx)
+		if err != nil {
+			return nil, err
+		}
 	} else {
 		receipt.Status = ethtypes.ReceiptStatusSuccessful
 	}
@@ -266,7 +290,7 @@ func (k *Keeper) ApplyTransaction(ctx sdk.Context, tx *ethtypes.Transaction) (*t
 	if !k.HasHooks() {
 		// If there are no hooks, we can commit the state immediately if the tx is successful
 		if commitFn != nil && !res.Failed() {
-			commitFn()
+			adopt()
 		}
 	} else {
 		// Note: PostTxProcessing hooks currently do not charge for gas
@@ -284,7 +308,7 @@ func (k *Keeper) ApplyTransaction(ctx sdk.Context, tx *ethtypes.Transaction) (*t
 			receipt.Bloom = ethtypes.Bloom{} // Clear bloom filter
 		} else {
 			if commitFn != nil {
-				commitFn()
+				adopt()
 			}
 
 			// Since the post-processing can alter the log, we need to update the result
@@ -393,6 +417,7 @@ func (k *Keeper) ApplyMessageWithConfig(ctx sdk.Context, stateDB *statedb.StateD
 	if stateDB == nil {
 		return nil, types.ErrNilStateDB
 	}
+	defer stateDB.ExecutionPanicRecovery()()
 	ethCfg := types.GetEthChainConfig()
 	evm := k.NewEVMWithOverridePrecompiles(ctx, msg, cfg, tracer, stateDB, overrides == nil)
 	// Gas limit suffices for the floor data cost (EIP-7623)
@@ -410,11 +435,9 @@ func (k *Keeper) ApplyMessageWithConfig(ctx sdk.Context, stateDB *statedb.StateD
 	// Allow the tracer captures the tx level events, mainly the gas consumption.
 	vmCfg := evm.Config
 	if vmCfg.Tracer != nil {
-		vmCfg.Tracer.OnTxStart(
-			evm.GetVMContext(),
-			ethtypes.NewTx(&ethtypes.LegacyTx{To: msg.To, Data: msg.Data, Value: msg.Value, Gas: msg.GasLimit}),
-			msg.From,
-		)
+		if vmCfg.Tracer.OnTxStart != nil {
+			vmCfg.Tracer.OnTxStart(evm.GetVMContext(), ethtypes.NewTx(&ethtypes.LegacyTx{To: msg.To, Data: msg.Data, Value: msg.Value, Gas: msg.GasLimit}), msg.From)
+		}
 		defer func() {
 			if vmCfg.Tracer.OnTxEnd != nil {
 				vmCfg.Tracer.OnTxEnd(&ethtypes.Receipt{GasUsed: msg.GasLimit - leftoverGas}, vmErr)

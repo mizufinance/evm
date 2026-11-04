@@ -44,8 +44,9 @@ var _ vm.StateDB = &StateDB{}
 // * Contracts
 // * Accounts
 type StateDB struct {
-	keeper Keeper
-	ctx    sdk.Context
+	executionFrames []executionFrame
+	keeper          Keeper
+	ctx             sdk.Context
 	// cacheCtx is used on precompile calls. It allows to commit the current journal
 	// entries to get the updated state in for the precompile call.
 	cacheCtx sdk.Context
@@ -180,6 +181,9 @@ func (s *StateDB) GetCacheContext() (sdk.Context, error) {
 		if err != nil {
 			return s.ctx, err
 		}
+	}
+	if n := len(s.executionFrames); n > 0 {
+		return s.cacheCtx.WithContext(s.executionFrames[n-1].context.Context()), nil
 	}
 	return s.cacheCtx, nil
 }
