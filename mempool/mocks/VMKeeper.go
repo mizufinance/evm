@@ -213,6 +213,26 @@ func (_m *VMKeeper) KVStoreKeys() map[string]*storetypes.KVStoreKey {
 	return r0
 }
 
+// TransientStoreKeys provides a mock function with no fields
+func (_m *VMKeeper) TransientStoreKeys() map[string]*storetypes.TransientStoreKey {
+	ret := _m.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for TransientStoreKeys")
+	}
+
+	var r0 map[string]*storetypes.TransientStoreKey
+	if rf, ok := ret.Get(0).(func() map[string]*storetypes.TransientStoreKey); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(map[string]*storetypes.TransientStoreKey)
+		}
+	}
+
+	return r0
+}
+
 // SetAccount provides a mock function with given fields: ctx, addr, account
 func (_m *VMKeeper) SetAccount(ctx types.Context, addr common.Address, account statedb.Account) error {
 	ret := _m.Called(ctx, addr, account)

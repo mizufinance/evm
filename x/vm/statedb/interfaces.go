@@ -40,4 +40,9 @@ type Keeper interface {
 	// Getter for injected KVStore keys
 	// It is used for StateDB.snapshotter creation
 	KVStoreKeys() map[string]*storetypes.KVStoreKey
+
+	// Getter for injected transient store keys
+	// It is used for StateDB.snapshotter creation so transient stores written
+	// before EVM execution are readable from precompiles.
+	TransientStoreKeys() map[string]*storetypes.TransientStoreKey
 }

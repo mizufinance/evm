@@ -13,15 +13,16 @@ import (
 )
 
 type Store struct {
-	stores    map[storetypes.StoreKey]types.SnapshotKVStore
-	storeKeys []*storetypes.KVStoreKey // ordered keys
-	head      int
+	stores     map[storetypes.StoreKey]types.SnapshotKVStore
+	storeKeys  []*storetypes.KVStoreKey        // ordered kv keys
+	tStoreKeys []*storetypes.TransientStoreKey // ordered transient keys
+	head       int
 }
 
 var _ types.SnapshotMultiStore = (*Store)(nil)
 
 // NewStore creates a new Store objectwith CacheMultiStore and KVStoreKeys
-func NewStore(cms storetypes.CacheMultiStore, keys map[string]*storetypes.KVStoreKey) *Store {
+func NewStore(cms storetypes.CacheMultiStore, keys map[string]*storetypes.KVStoreKey, tkeys map[string]*storetypes.TransientStoreKey) *Store {
 	s := &Store{
 		stores:    make(map[storetypes.StoreKey]types.SnapshotKVStore),
 		storeKeys: vmtypes.SortedKVStoreKeys(keys),
@@ -33,7 +34,28 @@ func NewStore(cms storetypes.CacheMultiStore, keys map[string]*storetypes.KVStor
 		s.stores[key] = snapshotkv.NewStore(store)
 	}
 
+	// transient keys are routed through GetKVStore just like kv keys; a
+	// cache-wrapped transient store implements CacheKVStore.
+	s.tStoreKeys = sortedTransientStoreKeys(tkeys)
+	for _, tk := range s.tStoreKeys {
+		store := cms.GetKVStore(tk).(storetypes.CacheKVStore)
+		s.stores[tk] = snapshotkv.NewStore(store)
+	}
+
 	return s
+}
+
+// sortedTransientStoreKeys returns the transient store keys ordered by name for
+// deterministic iteration.
+func sortedTransientStoreKeys(keys map[string]*storetypes.TransientStoreKey) []*storetypes.TransientStoreKey {
+	res := make([]*storetypes.TransientStoreKey, 0, len(keys))
+	for _, k := range keys {
+		res = append(res, k)
+	}
+	sort.Slice(res, func(i, j int) bool {
+		return res[i].Name() < res[j].Name()
+	})
+	return res
 }
 
 // NewStore creates a new Store object with KVStores
@@ -61,6 +83,9 @@ func (s *Store) Snapshot() int {
 	for _, key := range s.storeKeys {
 		s.stores[key].Snapshot()
 	}
+	for _, key := range s.tStoreKeys {
+		s.stores[key].Snapshot()
+	}
 	s.head++
 
 	// latest snapshot is just before head
@@ -73,6 +98,9 @@ func (s *Store) Snapshot() int {
 // This function panics if the index is out of bounds.
 func (s *Store) RevertToSnapshot(target int) {
 	for _, key := range s.storeKeys {
+		s.stores[key].RevertToSnapshot(target)
+	}
+	for _, key := range s.tStoreKeys {
 		s.stores[key].RevertToSnapshot(target)
 	}
 	s.head = target
@@ -160,6 +188,9 @@ func (s *Store) LatestVersion() int64 {
 // Write calls Write on each underlying store.
 func (s *Store) Write() {
 	for _, key := range s.storeKeys {
+		s.stores[key].Commit()
+	}
+	for _, key := range s.tStoreKeys {
 		s.stores[key].Commit()
 	}
 	s.head = types.InitialHead

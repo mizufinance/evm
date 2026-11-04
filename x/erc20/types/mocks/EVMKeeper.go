@@ -361,6 +361,26 @@ func (_m *EVMKeeper) KVStoreKeys() map[string]*storetypes.KVStoreKey {
 	return r0
 }
 
+// TransientStoreKeys provides a mock function with no fields
+func (_m *EVMKeeper) TransientStoreKeys() map[string]*storetypes.TransientStoreKey {
+	ret := _m.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for TransientStoreKeys")
+	}
+
+	var r0 map[string]*storetypes.TransientStoreKey
+	if rf, ok := ret.Get(0).(func() map[string]*storetypes.TransientStoreKey); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(map[string]*storetypes.TransientStoreKey)
+		}
+	}
+
+	return r0
+}
+
 // SetAccount provides a mock function with given fields: ctx, address, account
 func (_m *EVMKeeper) SetAccount(ctx types.Context, address common.Address, account statedb.Account) error {
 	ret := _m.Called(ctx, address, account)

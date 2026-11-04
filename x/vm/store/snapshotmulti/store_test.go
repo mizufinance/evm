@@ -9,8 +9,11 @@ import (
 	dbm "github.com/cosmos/cosmos-db"
 	"github.com/cosmos/evm/x/vm/store/snapshotmulti"
 
+	"cosmossdk.io/log"
 	"cosmossdk.io/store/cachekv"
 	"cosmossdk.io/store/dbadapter"
+	"cosmossdk.io/store/metrics"
+	"cosmossdk.io/store/rootmulti"
 	storetypes "cosmossdk.io/store/types"
 )
 
@@ -32,6 +35,41 @@ func TestSnapshotMultiIndexing(t *testing.T) {
 
 	idx2 := snapshotStore.Snapshot()
 	require.Equal(t, 2, idx2)
+}
+
+// setupTransientStore builds a snapshot store backed by a real cache-wrapped
+// transient store, exercising the NewStore transient-key path.
+func setupTransientStore(t *testing.T) (*snapshotmulti.Store, *storetypes.TransientStoreKey, storetypes.KVStore) {
+	t.Helper()
+	tkey := storetypes.NewTransientStoreKey("transient_test")
+	cms := rootmulti.NewStore(dbm.NewMemDB(), log.NewNopLogger(), metrics.NewNoOpMetrics())
+	cms.MountStoreWithDB(tkey, storetypes.StoreTypeTransient, nil)
+	require.NoError(t, cms.LoadLatestVersion())
+
+	cacheMS := cms.CacheMultiStore()
+	ss := snapshotmulti.NewStore(cacheMS, nil, map[string]*storetypes.TransientStoreKey{tkey.Name(): tkey})
+	return ss, tkey, cacheMS.GetKVStore(tkey)
+}
+
+func TestSnapshotMultiTransientKey(t *testing.T) {
+	snapshotStore, tkey, base := setupTransientStore(t)
+
+	// set/get works through the transient key
+	snapshotStore.GetKVStore(tkey).Set([]byte("a"), []byte("1"))
+	require.Equal(t, []byte("1"), snapshotStore.GetKVStore(tkey).Get([]byte("a")))
+
+	// survives Snapshot/Revert
+	idx0 := snapshotStore.Snapshot()
+	snapshotStore.GetKVStore(tkey).Set([]byte("b"), []byte("2"))
+	snapshotStore.RevertToSnapshot(idx0)
+	require.Nil(t, snapshotStore.GetKVStore(tkey).Get([]byte("b")))
+	require.Equal(t, []byte("1"), snapshotStore.GetKVStore(tkey).Get([]byte("a")))
+
+	// Write flushes into the underlying transient store
+	snapshotStore.Snapshot()
+	snapshotStore.GetKVStore(tkey).Set([]byte("c"), []byte("3"))
+	snapshotStore.Write()
+	require.Equal(t, []byte("3"), base.Get([]byte("c")))
 }
 
 func TestSnapshotMultiRevertAndWrite(t *testing.T) {

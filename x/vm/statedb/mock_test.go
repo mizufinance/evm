@@ -123,3 +123,7 @@ func (k MockKeeper) Clone() *MockKeeper {
 func (k MockKeeper) KVStoreKeys() map[string]*storetypes.KVStoreKey {
 	return make(map[string]*storetypes.KVStoreKey)
 }
+
+func (k MockKeeper) TransientStoreKeys() map[string]*storetypes.TransientStoreKey {
+	return make(map[string]*storetypes.TransientStoreKey)
+}

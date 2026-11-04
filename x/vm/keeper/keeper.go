@@ -45,6 +45,11 @@ type Keeper struct {
 	// KVStore Keys for modules wired to app
 	storeKeys map[string]*storetypes.KVStoreKey
 
+	// Transient store keys for modules wired to app. These are injected after
+	// construction via SetTransientStoreKeys so the StateDB snapshot store can
+	// route transient reads from precompiles. Nil by default (no-op).
+	tStoreKeys map[string]*storetypes.TransientStoreKey
+
 	// the address capable of executing a MsgUpdateParams message. Typically, this should be the x/gov module account.
 	authority sdk.AccAddress
 
@@ -420,6 +425,18 @@ func (k Keeper) AddTransientGasUsed(ctx sdk.Context, gasUsed uint64) (uint64, er
 // KVStoreKeys returns KVStore keys injected to keeper
 func (k Keeper) KVStoreKeys() map[string]*storetypes.KVStoreKey {
 	return k.storeKeys
+}
+
+// TransientStoreKeys returns transient store keys injected to keeper
+func (k Keeper) TransientStoreKeys() map[string]*storetypes.TransientStoreKey {
+	return k.tStoreKeys
+}
+
+// SetTransientStoreKeys injects external transient store keys so the StateDB
+// snapshot store routes their reads during EVM execution. Leave unset for a
+// no-op (nil map).
+func (k *Keeper) SetTransientStoreKeys(tkeys map[string]*storetypes.TransientStoreKey) {
+	k.tStoreKeys = tkeys
 }
 
 // SetEvmMempool sets the evm mempool

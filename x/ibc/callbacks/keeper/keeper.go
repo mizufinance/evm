@@ -128,6 +128,16 @@ func (k ContractKeeper) IBCReceivePacketCallback(
 	// We re-add the actual EVM call gas used to the original context after the call is complete
 	// with the gas retrieved from the EVM message result.
 	cachedCtx, writeFn := ctx.CacheContext()
+	cachedCtx, scope, err := evmtypes.BeginExecutionScope(cachedCtx)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if scope != nil {
+			scope.Abort()
+		}
+	}()
+
 	cachedCtx = evmante.BuildEvmExecutionCtx(cachedCtx).
 		WithGasMeter(evmtypes.NewInfiniteGasMeterWithLimit(cbData.CommitGasLimit))
 	stateDB := statedb.New(cachedCtx, k.evmKeeper, statedb.NewEmptyTxConfig())
@@ -226,7 +236,7 @@ func (k ContractKeeper) IBCReceivePacketCallback(
 	}
 
 	// Write cachedCtx events back to ctx.
-	writeFn()
+	evmtypes.AdoptExecutionScope(scope, writeFn)
 
 	// Check that the sender no longer has tokens after the callback.
 	// NOTE: contracts must implement an IERC20(token).transferFrom(msg.sender, address(this), amount)
@@ -297,6 +307,16 @@ func (k ContractKeeper) IBCOnAcknowledgementPacketCallback(
 	// We re-add the actual EVM call gas used to the original context after the call is complete
 	// with the gas retrieved from the EVM message result.
 	cachedCtx, writeFn := ctx.CacheContext()
+	cachedCtx, scope, err := evmtypes.BeginExecutionScope(cachedCtx)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if scope != nil {
+			scope.Abort()
+		}
+	}()
+
 	cachedCtx = evmante.BuildEvmExecutionCtx(cachedCtx).
 		WithGasMeter(evmtypes.NewInfiniteGasMeterWithLimit(cbData.CommitGasLimit))
 	stateDB := statedb.New(cachedCtx, k.evmKeeper, statedb.NewEmptyTxConfig())
@@ -338,7 +358,7 @@ func (k ContractKeeper) IBCOnAcknowledgementPacketCallback(
 		return errorsmod.Wrapf(types.ErrCallbackFailed, "out of gas")
 	}
 
-	writeFn()
+	evmtypes.AdoptExecutionScope(scope, writeFn)
 
 	return nil
 }
@@ -398,6 +418,16 @@ func (k ContractKeeper) IBCOnTimeoutPacketCallback(
 	// We re-add the actual EVM call gas used to the original context after the call is complete
 	// with the gas retrieved from the EVM message result.
 	cachedCtx, writeFn := ctx.CacheContext()
+	cachedCtx, scope, err := evmtypes.BeginExecutionScope(cachedCtx)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if scope != nil {
+			scope.Abort()
+		}
+	}()
+
 	cachedCtx = evmante.BuildEvmExecutionCtx(cachedCtx).
 		WithGasMeter(evmtypes.NewInfiniteGasMeterWithLimit(cbData.CommitGasLimit))
 	stateDB := statedb.New(cachedCtx, k.evmKeeper, statedb.NewEmptyTxConfig())
@@ -437,6 +467,6 @@ func (k ContractKeeper) IBCOnTimeoutPacketCallback(
 		return errorsmod.Wrapf(types.ErrCallbackFailed, "out of gas")
 	}
 
-	writeFn()
+	evmtypes.AdoptExecutionScope(scope, writeFn)
 	return nil
 }

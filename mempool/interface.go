@@ -29,6 +29,7 @@ type VMKeeperI interface {
 	SetCode(ctx sdk.Context, codeHash []byte, code []byte)
 	DeleteAccount(ctx sdk.Context, addr common.Address) error
 	KVStoreKeys() map[string]*storetypes.KVStoreKey
+	TransientStoreKeys() map[string]*storetypes.TransientStoreKey
 	SetEvmMempool(evmMempool *ExperimentalEVMMempool)
 }
 
