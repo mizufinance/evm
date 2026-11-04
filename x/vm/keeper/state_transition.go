@@ -184,8 +184,9 @@ func calculateCumulativeGasFromEthResponse(meter storetypes.GasMeter, res *types
 	return cumulativeGasUsed
 }
 
-// ApplyTransaction runs and attempts to perform a state transition with the given transaction (i.e Message), that will
-// only be persisted (committed) to the underlying KVStore if the transaction does not fail.
+// ApplyTransaction runs and attempts to perform a state transition with the given message (the signed Ethereum tx plus
+// its already-recovered sender), that will only be persisted (committed) to the underlying KVStore if the transaction
+// does not fail.
 //
 // # Gas tracking
 //
@@ -201,18 +202,30 @@ func calculateCumulativeGasFromEthResponse(meter storetypes.GasMeter, res *types
 // returning.
 //
 // For relevant discussion see: https://github.com/cosmos/cosmos-sdk/discussions/9072
-func (k *Keeper) ApplyTransaction(ctx sdk.Context, tx *ethtypes.Transaction) (*types.MsgEthereumTxResponse, error) {
+func (k *Keeper) ApplyTransaction(ctx sdk.Context, ethMsg *types.MsgEthereumTx) (*types.MsgEthereumTxResponse, error) {
+	tx := ethMsg.AsTransaction()
+
 	cfg, err := k.EVMConfig(ctx, ctx.BlockHeader().ProposerAddress)
 	if err != nil {
 		return nil, errorsmod.Wrap(err, "failed to load evm config")
 	}
 	txConfig := k.TxConfig(ctx, tx.Hash())
 
-	// get the signer according to the chain rules from the config and block height
-	signer := ethtypes.MakeSigner(types.GetEthChainConfig(), big.NewInt(ctx.BlockHeight()), uint64(ctx.BlockTime().Unix())) //#nosec G115 -- int overflow is not a concern here
-	msg, err := core.TransactionToMessage(tx, signer, cfg.BaseFee)
-	if err != nil {
-		return nil, errorsmod.Wrap(err, "failed to return ethereum transaction as core message")
+	// The sender is recovered (ecrecover) and verified once in the ante handler
+	// (SignatureVerificationWithCache) before this runs in consensus, and is carried on
+	// the msg's From field. Reuse it here via AsMessage instead of recovering again -
+	// otherwise every validator re-runs ecrecover for every tx, every block. Fall back to
+	// recovery for callers that don't populate From (eg. simulation / tracing / tests).
+	var msg *core.Message
+	if len(ethMsg.From) == common.AddressLength {
+		msg = ethMsg.AsMessage(cfg.BaseFee)
+	} else {
+		// get the signer according to the chain rules from the config and block height
+		signer := ethtypes.MakeSigner(types.GetEthChainConfig(), big.NewInt(ctx.BlockHeight()), uint64(ctx.BlockTime().Unix())) //#nosec G115 -- int overflow is not a concern here
+		msg, err = core.TransactionToMessage(tx, signer, cfg.BaseFee)
+		if err != nil {
+			return nil, errorsmod.Wrap(err, "failed to return ethereum transaction as core message")
+		}
 	}
 
 	// create a cache context to revert state. The cache context is only committed when both tx and hooks executed successfully.
@@ -279,10 +292,8 @@ func (k *Keeper) ApplyTransaction(ctx sdk.Context, tx *ethtypes.Transaction) (*t
 		receipt.Status = ethtypes.ReceiptStatusSuccessful
 	}
 
-	signerAddr, err := signer.Sender(tx)
-	if err != nil {
-		return nil, errorsmod.Wrap(err, "failed to extract sender address from ethereum transaction")
-	}
+	// reuse the sender already resolved into the core message above (no second ecrecover)
+	signerAddr := msg.From
 
 	eventsLen := len(tmpCtx.EventManager().Events())
 

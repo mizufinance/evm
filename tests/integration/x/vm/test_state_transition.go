@@ -617,7 +617,7 @@ func (s *KeeperTestSuite) TestApplyTransaction() {
 			initialBalance := s.Network.App.GetBankKeeper().GetBalance(ctx, s.Keyring.GetAccAddr(0), "aatom")
 
 			ethMsg := tx.GetMsgs()[0].(*types.MsgEthereumTx)
-			res, err := s.Network.App.GetEVMKeeper().ApplyTransaction(ctx, ethMsg.AsTransaction())
+			res, err := s.Network.App.GetEVMKeeper().ApplyTransaction(ctx, ethMsg)
 			s.Require().NoError(err)
 			s.Require().Equal(res.GasUsed, uint64(3e6))
 			// Half of the gas should be refunded based on the protocol refund cap.
@@ -677,7 +677,7 @@ func (s *KeeperTestSuite) TestApplyTransactionWithTxPostProcessing() {
 				s.Require().NoError(err)
 
 				ethMsg := tx.GetMsgs()[0].(*types.MsgEthereumTx)
-				res, err := s.Network.App.GetEVMKeeper().ApplyTransaction(s.Network.GetContext(), ethMsg.AsTransaction())
+				res, err := s.Network.App.GetEVMKeeper().ApplyTransaction(s.Network.GetContext(), ethMsg)
 				s.Require().NoError(err)
 				s.Require().False(res.Failed())
 
@@ -717,7 +717,7 @@ func (s *KeeperTestSuite) TestApplyTransactionWithTxPostProcessing() {
 				s.Require().NoError(err)
 
 				ethMsg := tx.GetMsgs()[0].(*types.MsgEthereumTx)
-				res, err := s.Network.App.GetEVMKeeper().ApplyTransaction(s.Network.GetContext(), ethMsg.AsTransaction())
+				res, err := s.Network.App.GetEVMKeeper().ApplyTransaction(s.Network.GetContext(), ethMsg)
 				s.Require().NoError(err)
 				s.Require().True(res.Failed())
 
@@ -759,7 +759,7 @@ func (s *KeeperTestSuite) TestApplyTransactionWithTxPostProcessing() {
 				s.Require().NoError(err)
 
 				ethMsg := tx.GetMsgs()[0].(*types.MsgEthereumTx)
-				res, err := s.Network.App.GetEVMKeeper().ApplyTransaction(s.Network.GetContext(), ethMsg.AsTransaction())
+				res, err := s.Network.App.GetEVMKeeper().ApplyTransaction(s.Network.GetContext(), ethMsg)
 				s.Require().NoError(err)
 				s.Require().True(res.Failed())
 
