@@ -458,7 +458,12 @@ func startInProcess(svrCtx *server.Context, clientCtx client.Context, opts Start
 	// service if API or gRPC or JSONRPC is enabled, and avoid doing so in the general
 	// case, because it spawns a new local CometBFT RPC client.
 	if (config.API.Enable || config.GRPC.Enable || config.JSONRPC.Enable || config.JSONRPC.EnableIndexer) && bftNode != nil {
-		clientCtx = clientCtx.WithClient(local.New(bftNode))
+		var cometClient client.CometRPC
+		cometClient, err = wrapCometClient(app, local.New(bftNode))
+		if err != nil {
+			return err
+		}
+		clientCtx = clientCtx.WithClient(cometClient)
 
 		app.RegisterTxService(clientCtx)
 		app.RegisterTendermintService(clientCtx)
